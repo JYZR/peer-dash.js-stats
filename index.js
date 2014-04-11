@@ -1,6 +1,7 @@
+var port = process.env.PORT || 10000;
 var WebSocketServer = require('ws').Server,
     wss = new WebSocketServer({
-        port: 10000
+        port: port
     });
 
 var fromPeers = 0;
