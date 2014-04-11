@@ -14,8 +14,8 @@ wss.on('connection', function(ws) {
                 fromPeers++;
             else if (message == 'SERVER')
                 fromServer++;
-            console.log("From Peers:  %s % (%s)", fromPeers / (fromPeers + fromServer) * 100, fromPeers);
-            console.log("From Server: %s % (%s)", fromServer / (fromPeers + fromServer) * 100, fromServer);
+            console.log("From Peers:  %s % (%s)", (fromPeers / (fromPeers + fromServer) * 100).toFixed(), fromPeers);
+            console.log("From Server: %s % (%s)", (fromServer / (fromPeers + fromServer) * 100).toFixed(), fromServer);
         } else {
             console.log('Received message: %s', message);
         }
