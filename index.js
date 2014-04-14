@@ -9,6 +9,7 @@ var fromServer = 0;
 
 wss.on('connection', function(ws) {
     ws.on('message', function(message) {
+        message = JSON.parse(message);
         switch (message.type) {
             case 'registration':
                 console.log(message.id + " connected");
