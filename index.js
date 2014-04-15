@@ -16,6 +16,13 @@ var REASON_INIT_BUFFER = 'INIT_BUFFER',
     REASON_FALLBACK = 'FALLBACK',
     REASON_NO_PEERS = 'NO_PEERS';
 
+var reasonCounters = {};
+reasonCounters[REASON_INIT_BUFFER] = 0;
+reasonCounters[REASON_RESPONSIBLE] = 0;
+reasonCounters[REASON_FALLBACK] = 0;
+reasonCounters[REASON_NO_PEERS] = 0;
+
+
 /* Boilerplate */
 function containsKey(obj, key) {
     return typeof obj[key] !== 'undefined';
@@ -27,10 +34,12 @@ var onRegistration = function(message) {
 
 var onStats = function(message) {
     counters[message.source]++;
+    reasonCounters[message.reason]++;
     var now = Date.now();
     // Adds to stash array
     stats.push({
         source: message.source,
+        reason: message.reason,
         time: now
     });
     // Remove old stats
@@ -38,6 +47,7 @@ var onStats = function(message) {
         var s = stats.shift();
         if (now - s.time > STATS_TIME_INTERVAL) {
             counters[s.source]--;
+            reasonCounters[s.reason]--;
         } else {
             stats.unshift(s);
             break;
@@ -48,10 +58,16 @@ var onStats = function(message) {
     console.log("--- Stats for the last %s seconds ---", STATS_TIME_INTERVAL / 1000);
     console.log("From Peers:  %s % (%s)", (cp / (cp + cs) * 100).toFixed(), cp);
     console.log("From Server: %s % (%s)", (cs / (cp + cs) * 100).toFixed(), cs);
+
+    console.log("--- Reasons for fetching from server ---");
+    console.log("REASON_INIT_BUFFER: %s", reasonCounters[REASON_INIT_BUFFER]);
+    console.log("REASON_RESPONSIBLE: %s", reasonCounters[REASON_RESPONSIBLE]);
+    console.log("REASON_FALLBACK:    %s", reasonCounters[REASON_FALLBACK]);
+    console.log("REASON_NO_PEERS:    %s", reasonCounters[REASON_NO_PEERS]);
 };
 
 var onPing = function() {
-    console.log("Received ping message");
+    // console.log("Received ping message");
 };
 
 var cases = {
