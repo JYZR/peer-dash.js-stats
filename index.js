@@ -19,7 +19,7 @@ var REASON_INIT_BUFFER = 'INIT_BUFFER',
 /* Boilerplate */
 function containsKey(obj, key) {
     return typeof obj[key] !== 'undefined';
-};
+}
 
 var onRegistration = function(message) {
     console.log(message.id + " connected");
@@ -68,7 +68,7 @@ wss.on('connection', function(ws) {
                 cases[message.type](message);
             } else {
                 console.log('Received unexpected message: %s', message);
-            };
+            }
         } catch (error) {
             console.log('Received a message which was not JSON encoded: %s, error: %s', message, error);
         }
