@@ -14,14 +14,20 @@ var STATS_TIME_INTERVAL = 10 * 1000; // 10 seconds
 var REASON_INIT_BUFFER = 'INIT_BUFFER',
     REASON_RESPONSIBLE = 'RESPONSIBLE',
     REASON_FALLBACK = 'FALLBACK',
-    REASON_NO_PEERS = 'NO_PEERS';
+    REASON_NO_PEERS = 'NO_PEERS',
+    REASON_LOW_BUFFER = 'LOW_BUFFER';
 
 var reasonCounters = {};
 reasonCounters[REASON_INIT_BUFFER] = 0;
 reasonCounters[REASON_RESPONSIBLE] = 0;
 reasonCounters[REASON_FALLBACK] = 0;
 reasonCounters[REASON_NO_PEERS] = 0;
+reasonCounters[REASON_LOW_BUFFER] = 0;
 
+dryBufferCounters = {};
+dryBufferCounters['video'] = 0;
+dryBufferCounters['audio'] = 0;
+var dryBufferStats = [];
 
 /* Boilerplate */
 function containsKey(obj, key) {
@@ -53,8 +59,46 @@ var onStats = function(message) {
             break;
         }
     }
+    printStats();
+};
+
+var onDryBuffer = function(message) {
+    dryBufferCounters[message.media]++;
+    var now = Date.now();
+    // Adds to stash array
+    dryBufferStats.push({
+        time: now,
+        media: message.media
+    });
+    // Remove old stats
+    while (dryBufferStats.length > 0) {
+        var s = dryBufferStats.shift();
+        if (now - s.time > STATS_TIME_INTERVAL) {
+            dryBufferCounters[s.media]--;
+        } else {
+            dryBufferStats.unshift(s);
+            break;
+        }
+    }
+    printStats();
+};
+
+var onPing = function() {
+    // console.log("Received ping message");
+    printStats();
+};
+
+var cases = {
+    'registration': onRegistration,
+    'stats': onStats,
+    'ping': onPing,
+    'dry-buffer': onDryBuffer
+};
+
+var printStats = function() {
     var cs = counters['server'];
     var cp = counters['peer'];
+
     console.log("--- Stats for the last %s seconds ---", STATS_TIME_INTERVAL / 1000);
     console.log("From Peers:  %s % (%s)", (cp / (cp + cs) * 100).toFixed(), cp);
     console.log("From Server: %s % (%s)", (cs / (cp + cs) * 100).toFixed(), cs);
@@ -64,16 +108,13 @@ var onStats = function(message) {
     console.log("REASON_RESPONSIBLE: %s", reasonCounters[REASON_RESPONSIBLE]);
     console.log("REASON_FALLBACK:    %s", reasonCounters[REASON_FALLBACK]);
     console.log("REASON_NO_PEERS:    %s", reasonCounters[REASON_NO_PEERS]);
-};
+    console.log("REASON_LOW_BUFFER:  %s", reasonCounters[REASON_LOW_BUFFER]);
 
-var onPing = function() {
-    // console.log("Received ping message");
-};
+    console.log("--- Dry buffer stats ---");
+    console.log("Dry video buffer: " + dryBufferCounters['video']);
+    console.log("Dry audio buffer: " + dryBufferCounters['audio']);
 
-var cases = {
-    'registration': onRegistration,
-    'stats': onStats,
-    'ping': onPing
+    console.log(); // New line
 };
 
 wss.on('connection', function(ws) {
