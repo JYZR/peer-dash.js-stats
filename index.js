@@ -10,6 +10,7 @@ counters['server'] = 0;
 
 var stats = [];
 var STATS_TIME_INTERVAL = 10 * 1000; // 10 seconds
+var REMOVE_OLD_STATS_TIME_INTERVAL = 1 * 1000; // 1 second
 
 var REASON_INIT_BUFFER = 'INIT_BUFFER',
     REASON_RESPONSIBLE = 'RESPONSIBLE',
@@ -60,14 +61,15 @@ var onRegistration = function(message) {
 var onStats = function(message) {
     counters[message.source]++;
     reasonCounters[message.reason]++;
-    var now = Date.now();
-    // Adds to stash array
     stats.push({
         source: message.source,
         reason: message.reason,
-        time: now
+        time: Date.now()
     });
-    // Remove old stats
+    printStats();
+};
+
+var removeOldStats = function(now) {
     while (stats.length > 0) {
         var s = stats.shift();
         if (now - s.time > STATS_TIME_INTERVAL) {
@@ -78,18 +80,18 @@ var onStats = function(message) {
             break;
         }
     }
-    printStats();
 };
 
 var onNoData = function(message) {
     noDataReasonCounters[message.reason]++;
-    var now = Date.now();
-    // Adds to stash array
     noData.push({
         reason: message.reason,
-        time: now
+        time: Date.now()
     });
-    // Remove old noData
+    printStats();
+};
+
+var removeOldNoData = function(now) {
     while (noData.length > 0) {
         var nd = noData.shift();
         if (now - nd.time > STATS_TIME_INTERVAL) {
@@ -99,18 +101,19 @@ var onNoData = function(message) {
             break;
         }
     }
-    printStats();
 };
 
 var onDryBuffer = function(message) {
     dryBufferCounters[message.media]++;
     var now = Date.now();
-    // Adds to stash array
     dryBufferStats.push({
         time: now,
         media: message.media
     });
-    // Remove old stats
+    printStats();
+};
+
+var removeOldDryBuffer = function(now) {
     while (dryBufferStats.length > 0) {
         var s = dryBufferStats.shift();
         if (now - s.time > STATS_TIME_INTERVAL) {
@@ -120,11 +123,44 @@ var onDryBuffer = function(message) {
             break;
         }
     }
-    printStats();
 };
+
+var removeOldData = function() {
+    var now = Date.now();
+    removeOldStats(now);
+    removeOldNoData(now);
+    removeOldDryBuffer(now);
+};
+setInterval(removeOldData, REMOVE_OLD_STATS_TIME_INTERVAL);
 
 var onPing = function() {
     // console.log("Received ping message");
+};
+
+var onGlobalStats = function(message, ws) {
+    countersSum = counters['peer'] + counters['server'];
+    ws.send(JSON.stringify({
+        type: 'global-stats',
+        interval: STATS_TIME_INTERVAL / 1000, // Seconds
+        fromPeers: counters['peer'],
+        fromServer: counters['server'],
+        fromPeersShare: (counters['peer'] / countersSum * 100).toFixed(),
+        fromServerShare: (counters['server'] / countersSum * 100).toFixed(),
+        reasonInitBuffer: reasonCounters[REASON_INIT_BUFFER],
+        reasonResponsible: reasonCounters[REASON_RESPONSIBLE],
+        reasonFallback: reasonCounters[REASON_FALLBACK],
+        reasonNoPeers: reasonCounters[REASON_NO_PEERS],
+        reasonLowBuffer: reasonCounters[REASON_LOW_BUFFER],
+        reasonNoDataNoDecisionYet: noDataReasonCounters[REASON_NO_DATA_NO_DECISION_YET],
+        reasonNoDataOtherBitrate: noDataReasonCounters[REASON_NO_DATA_OTHER_BITRATE],
+        reasonNoDataNotResponsible: noDataReasonCounters[REASON_NO_DATA_NOT_RESPONSIBLE],
+        reasonNoDataPaused: noDataReasonCounters[REASON_NO_DATA_PAUSED],
+        reasonNoDataNotStarted: noDataReasonCounters[REASON_NO_DATA_NOT_STARTED],
+        reasonNoDataInitBuffer: noDataReasonCounters[REASON_NO_DATA_INIT_BUFFER],
+        reasonNoDataNotYetDownloaded: noDataReasonCounters[REASON_NO_DATA_NOT_YET_DOWNLOADED],
+        dryBufferCounterVideo: dryBufferCounters['video'],
+        dryBufferCounterAudio: dryBufferCounters['audio']
+    }));
 };
 
 var cases = {
@@ -132,7 +168,8 @@ var cases = {
     'stats': onStats,
     'ping': onPing,
     'dry-buffer': onDryBuffer,
-    'no-data': onNoData
+    'no-data': onNoData,
+    'global-stats': onGlobalStats
 };
 
 var printStats = function() {
@@ -171,7 +208,7 @@ wss.on('connection', function(ws) {
         try {
             message = JSON.parse(message);
             if (containsKey(cases, message.type)) {
-                cases[message.type](message);
+                cases[message.type](message, ws);
             } else {
                 console.log('Received unexpected message: %s', message);
             }
