@@ -24,6 +24,25 @@ reasonCounters[REASON_FALLBACK] = 0;
 reasonCounters[REASON_NO_PEERS] = 0;
 reasonCounters[REASON_LOW_BUFFER] = 0;
 
+var noData = [];
+
+var REASON_NO_DATA_NO_DECISION_YET = 'NO_DECISION_YET',
+    REASON_NO_DATA_OTHER_BITRATE = 'OTHER_BITRATE',
+    REASON_NO_DATA_NOT_RESPONSIBLE = 'NOT_RESPONSIBLE',
+    REASON_NO_DATA_PAUSED = 'PAUSED',
+    REASON_NO_DATA_NOT_STARTED = 'NOT_STARTED',
+    REASON_NO_DATA_INIT_BUFFER = 'INIT_BUFFER',
+    REASON_NO_DATA_NOT_YET_DOWNLOADED = 'NOT_YET_DOWNLOADED';
+
+var noDataReasonCounters = {};
+noDataReasonCounters[REASON_NO_DATA_NO_DECISION_YET] = 0;
+noDataReasonCounters[REASON_NO_DATA_OTHER_BITRATE] = 0;
+noDataReasonCounters[REASON_NO_DATA_NOT_RESPONSIBLE] = 0;
+noDataReasonCounters[REASON_NO_DATA_PAUSED] = 0;
+noDataReasonCounters[REASON_NO_DATA_NOT_STARTED] = 0;
+noDataReasonCounters[REASON_NO_DATA_INIT_BUFFER] = 0;
+noDataReasonCounters[REASON_NO_DATA_NOT_YET_DOWNLOADED] = 0;
+
 dryBufferCounters = {};
 dryBufferCounters['video'] = 0;
 dryBufferCounters['audio'] = 0;
@@ -62,6 +81,27 @@ var onStats = function(message) {
     printStats();
 };
 
+var onNoData = function(message) {
+    noDataReasonCounters[message.reason]++;
+    var now = Date.now();
+    // Adds to stash array
+    noData.push({
+        reason: message.reason,
+        time: now
+    });
+    // Remove old noData
+    while (noData.length > 0) {
+        var nd = noData.shift();
+        if (now - nd.time > STATS_TIME_INTERVAL) {
+            noDataReasonCounters[nd.reason]--;
+        } else {
+            noData.unshift(nd);
+            break;
+        }
+    }
+    printStats();
+};
+
 var onDryBuffer = function(message) {
     dryBufferCounters[message.media]++;
     var now = Date.now();
@@ -85,14 +125,14 @@ var onDryBuffer = function(message) {
 
 var onPing = function() {
     // console.log("Received ping message");
-    printStats();
 };
 
 var cases = {
     'registration': onRegistration,
     'stats': onStats,
     'ping': onPing,
-    'dry-buffer': onDryBuffer
+    'dry-buffer': onDryBuffer,
+    'no-data': onNoData
 };
 
 var printStats = function() {
@@ -113,6 +153,15 @@ var printStats = function() {
     console.log("--- Dry buffer stats ---");
     console.log("Dry video buffer: " + dryBufferCounters['video']);
     console.log("Dry audio buffer: " + dryBufferCounters['audio']);
+
+    console.log("--- Reasons for no data ---");
+    console.log("REASON_NO_DATA_NO_DECISION_YET: %s", noDataReasonCounters[REASON_NO_DATA_NO_DECISION_YET]);
+    console.log("REASON_NO_DATA_OTHER_BITRATE: %s", noDataReasonCounters[REASON_NO_DATA_OTHER_BITRATE]);
+    console.log("REASON_NO_DATA_NOT_RESPONSIBLE: %s", noDataReasonCounters[REASON_NO_DATA_NOT_RESPONSIBLE]);
+    console.log("REASON_NO_DATA_PAUSED: %s", noDataReasonCounters[REASON_NO_DATA_PAUSED]);
+    console.log("REASON_NO_DATA_NOT_STARTED: %s", noDataReasonCounters[REASON_NO_DATA_NOT_STARTED]);
+    console.log("REASON_NO_DATA_INIT_BUFFER: %s", noDataReasonCounters[REASON_NO_DATA_INIT_BUFFER]);
+    console.log("REASON_NO_DATA_NOT_YET_DOWNLOADED: %s", noDataReasonCounters[REASON_NO_DATA_NOT_YET_DOWNLOADED]);
 
     console.log(); // New line
 };
